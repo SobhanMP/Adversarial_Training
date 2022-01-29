@@ -1,6 +1,8 @@
+from collections import defaultdict
 import time
 import torch
-
+import torch.nn.functional as F
+"""Set the gradient of a tensor to zero, just like torch.optim.Optimizer"""
 def tensor_zero_grad(x, set_to_none: bool = False):
     if x.grad is not None:
         if set_to_none:
@@ -11,8 +13,10 @@ def tensor_zero_grad(x, set_to_none: bool = False):
             else:
                 x.grad.requires_grad_(False)
             x.grad.zero_()
-    """
-copyright doofenshmirtz co.
+
+""" A batched average tracker
+
+
 """
 class Collectinator:
     def __init__(self, mean=0):
@@ -23,19 +27,40 @@ class Collectinator:
         self.mean = self.mean * (self.n / nm) + v * (m / nm)
         self.n = nm 
 
+
+""" A performance tracker
+
+Track accuracy, loss and runtime
+"""
 class Logisticator:
     def __init__(self) -> None:
-        self.acc = Collectinator()
-        self.loss = Collectinator()
+        self._acc = Collectinator()
+        self._loss = Collectinator()
+        self.acc = 0
+        self.loss = 0
         self.now = time.time()
-    
+        self.end_time = None
+
     def add(self, acc, loss, m):
-        self.acc.add(acc, m)
-        self.loss.add(loss, m)
+        self._acc.add(acc, m)
+        self.acc = self._acc.mean
+        self._loss.add(loss, m)
+        self.loss = self._loss.mean
 
     def __str__(self):
-        return f'{self.loss.mean:.4f} {self.acc.mean * 100:0.1f}% {time.time() - self.now:.1f}s'
+        self.end()
+        return f'{self.loss:.4f} {self.acc * 100:0.1f}% {self.end_time - self.now:.1f}s'
+    
+    def end(self):
+        if self.end_time is None:
+            self.end_time = time.time()
+            self.time = self.end_time - self.now
 
+"""
+Take the average but instead of reducing the dims, keep them
+
+Is there a pytorch version already?
+"""
 def mean_keepdim(inputs, dims):
     d = [i for i in range(len(inputs.shape)) 
         if i not in dims]
@@ -44,3 +69,70 @@ def mean_keepdim(inputs, dims):
 def accuracy(outputs, labels):
     preds = torch.argmax(outputs, axis=1)
     return torch.sum(preds == labels).item() / len(preds)
+
+def train_with_replay(K, model, trainloader, optimizer, epoch, 
+    input_func=lambda x, y: x,
+    after_func=lambda model: None):
+    logs = Logisticator()
+    
+    model.train()
+
+    for data in trainloader:
+        # get the inputs; data is a list of [inputs, labels]
+        inputs, labels = map(lambda x: x.cuda(), data)
+        for k in range(K):
+            inputs = input_func(inputs, labels)
+            # zero the parameter gradients
+            optimizer.zero_grad()
+
+            # forward + backward + optimize
+            outputs = model(inputs)
+            loss = F.cross_entropy(outputs, labels)
+            loss.backward()
+
+            optimizer.step()
+            after_func(model)
+
+            acc = accuracy(outputs, labels)
+            logs.add(acc, loss.item(), inputs.size(0))
+    print(f'train \t {epoch + 1}: {logs}')
+    return logs
+def run_val(model, testloader, epoch):
+    model.train(False)
+    # valdiation loss
+    with torch.no_grad():
+        logs = Logisticator()
+        
+        for data in testloader:
+            inputs, labels = map(lambda x: x.cuda(), data)
+            outputs = model(inputs)
+            loss = F.cross_entropy(outputs, labels)
+
+            acc = accuracy(outputs, labels)
+            logs.add(acc, loss.item(), inputs.size(0))
+
+        print(f'val \t {epoch + 1}: {logs}')
+    return logs
+def run_attacks(logholder, attacks, attack_names, model, testloader, epoch):
+    model.train(False)
+    for (attack, name) in zip(attacks, attack_names):
+        logs = Logisticator()
+        logholder[f'adv_test/{name}'].append(logs)
+        for data in testloader:
+            inputs, labels = map(lambda x: x.cuda(), data)
+            adv = attack(model, inputs, labels)
+
+            with torch.no_grad():
+                outputs = model(adv)
+                loss = F.cross_entropy(outputs, labels)
+
+                acc = accuracy(outputs, labels)
+                logs.add(acc, loss.item(), inputs.size(0))
+        print(f'adv {name} \t\t\t {epoch + 1}: {logs}')
+
+def bimap(f, g, x):
+    return [(f(a), g(b)) for (a, b) in x]
+def identity(x):
+    return x
+def holder_to_dict(holder: defaultdict):
+    return dict(bimap(identity, dict, holder.items()))
