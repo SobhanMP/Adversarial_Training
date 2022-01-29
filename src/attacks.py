@@ -86,8 +86,10 @@ class CW(Attack):
 
             correct_logit = p[torch.arange(p.shape[0]), y]
             wrong_logit = ((1 - mask) * p - self.c * mask).max(axis=1)[0]
-            loss = F.relu(correct_logit - wrong_logit).sum()
+            loss = -F.relu(correct_logit - wrong_logit).sum()
             loss.backward()
+
+            self.step(noise)
 
         self.zero(model, noise)
         self.finalize(noise)

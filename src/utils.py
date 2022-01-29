@@ -1,3 +1,4 @@
+from calendar import EPOCH
 from collections import defaultdict
 import time
 import torch
@@ -33,14 +34,15 @@ class Collectinator:
 Track accuracy, loss and runtime
 """
 class Logisticator:
-    def __init__(self) -> None:
+    def __init__(self, epoch=None) -> None:
         self._acc = Collectinator()
         self._loss = Collectinator()
         self.acc = 0
         self.loss = 0
         self.now = time.time()
         self.end_time = None
-
+        self.epoch = epoch
+    
     def add(self, acc, loss, m):
         self._acc.add(acc, m)
         self.acc = self._acc.mean
@@ -73,7 +75,7 @@ def accuracy(outputs, labels):
 def train_with_replay(K, model, trainloader, optimizer, epoch, 
     input_func=lambda x, y: x,
     after_func=lambda model: None):
-    logs = Logisticator()
+    logs = Logisticator(epoch)
     
     model.train()
 
@@ -97,11 +99,12 @@ def train_with_replay(K, model, trainloader, optimizer, epoch,
             logs.add(acc, loss.item(), inputs.size(0))
     print(f'train \t {epoch + 1}: {logs}')
     return logs
+
 def run_val(model, testloader, epoch):
     model.train(False)
     # valdiation loss
     with torch.no_grad():
-        logs = Logisticator()
+        logs = Logisticator(epoch)
         
         for data in testloader:
             inputs, labels = map(lambda x: x.cuda(), data)
@@ -113,10 +116,11 @@ def run_val(model, testloader, epoch):
 
         print(f'val \t {epoch + 1}: {logs}')
     return logs
+
 def run_attacks(logholder, attacks, attack_names, model, testloader, epoch):
     model.train(False)
     for (attack, name) in zip(attacks, attack_names):
-        logs = Logisticator()
+        logs = Logisticator(epoch)
         logholder[f'adv_test/{name}'].append(logs)
         for data in testloader:
             inputs, labels = map(lambda x: x.cuda(), data)
