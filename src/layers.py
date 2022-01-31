@@ -76,12 +76,14 @@ Usage notes
 '''
 class AdversarialForFree(nn.Module):
     def __init__(self, e, min=0, max=1,
-                 auto_zero_grad: bool = True):
+                 auto_zero_grad: bool = True, e_s = None, random_init=False):
 
         super(AdversarialForFree, self).__init__()
+        self.e_s = e if e_s is None else e_s
         self.e = e
         self.min, self.max = min, max
         self.auto_zero_grad = auto_zero_grad
+        self.random_init = random_init
 
     def forward(self, x, auto_zero_grad=None):
         if auto_zero_grad is None:
@@ -92,7 +94,11 @@ class AdversarialForFree(nn.Module):
 
         if self.training:
             if not hasattr(self, 'm') or self.m.shape != x.shape:
-                m = torch.zeros_like(x, device=x.device, requires_grad=True)
+                if self.random_init:
+                    m = torch.rand(x.shape, device=x.device) * 2 * self.e - self.e
+                    m.requires_grad_()
+                else:
+                    m = torch.zeros_like(x, device=x.device, requires_grad=True)
                 self.register_buffer('m', m)
             return (x + self.m).clamp(self.min, self.max)
         else:
@@ -101,7 +107,7 @@ class AdversarialForFree(nn.Module):
     def step(self):
         with torch.no_grad():
             self.m.grad.sign_()
-            self.m += self.e * self.m.grad
+            self.m += self.e_s * self.m.grad
             self.m.clamp_(-self.e, self.e)
 
     def zero_grad(self):
