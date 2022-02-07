@@ -20,4 +20,17 @@ def PGK(model, criterion, x, e, K, min=0, max=1):
             noise.clamp_(-e, e)
     
     return noise
+
+
+def FGSM(model, criterion, x, e, K, min=0, max=1):
+    
+    noise = torch.zeros_like(x, device=x.device, requires_grad=True)
+    model.zero_grad()
+    tensor_zero_grad(noise)
+    outputs = model((x + noise).clamp(min, max))
+    loss = criterion(outputs)
+  
+    loss.backward()
+    return e * noise.grad.detach().sign()
+
     
