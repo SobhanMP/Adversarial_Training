@@ -52,8 +52,9 @@ class Attack:
         self.t = model.training # for 7-PDG training
         model.train(False)
 class PGD(Attack):
-    def __init__(self, K, e, e_s, min=0, max=1, loss=F.cross_entropy) -> None:
+    def __init__(self, K, e, e_s, min=0, max=1, loss=F.cross_entropy, early_stopping=False) -> None:
         super().__init__(K, e, e_s, min, max)
+        self.early_stopping = early_stopping
         self.loss = loss
 
     def __call__(self, model, x, y):
@@ -64,7 +65,13 @@ class PGD(Attack):
             self.zero(model, noise)    
             
             p = self.run(model, x, noise)
-
+            
+            if self.early_stopping:
+                pm = p.max(axis=1)[0]
+                py = p[torch.arange(x.size(0)), y] 
+                if (py < pm).all():
+                    break
+            
             loss = self.loss(p, y)
             loss.backward()
             

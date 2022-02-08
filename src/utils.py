@@ -100,7 +100,7 @@ def train_with_replay(K, model, trainloader, optimizer, epoch,
     print(f'train \t {epoch + 1}: {logs}')
     return logs
 
-def run_val(model, testloader, epoch):
+def run_val(model, testloader, epoch, name='val'):
     model.train(False)
     # valdiation loss
     with torch.no_grad():
@@ -114,14 +114,14 @@ def run_val(model, testloader, epoch):
             acc = accuracy(outputs, labels)
             logs.add(acc, loss.item(), inputs.size(0))
 
-        print(f'val \t {epoch + 1}: {logs}')
+        print(f'{name} \t {epoch + 1}: {logs}')
     return logs
 
-def run_attacks(logholder, attacks, attack_names, model, testloader, epoch):
+def run_attacks(logholder, attacks, attack_names, model, testloader, epoch, category='adv_test'):
     model.train(False)
     for (attack, name) in zip(attacks, attack_names):
         logs = Logisticator(epoch)
-        logholder[f'adv_test/{name}'].append(logs)
+        logholder[f'{category}/{name}'].append(logs)
         for data in testloader:
             inputs, labels = map(lambda x: x.cuda(), data)
             adv = attack(model, inputs, labels)
@@ -132,7 +132,7 @@ def run_attacks(logholder, attacks, attack_names, model, testloader, epoch):
 
                 acc = accuracy(outputs, labels)
                 logs.add(acc, loss.item(), inputs.size(0))
-        print(f'adv {name} \t\t\t {epoch + 1}: {logs}')
+        print(f'{category}/{name} \t {epoch + 1}: {logs}')
 
 def bimap(f, g, x):
     return [(f(a), g(b)) for (a, b) in x]
