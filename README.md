@@ -1,5 +1,9 @@
 # Implementation of [Adversarial Training for Free!](https://arxiv.org/abs/1904.12843)
 
+
+[Maxime's fork of the official repo with tensorflow 2 migration is here](https://github.com/MaxHeuillet/free_adv_train), the fashion mnist example is in the **small_batch** branch.
+
+
 This is a reimplementation from scratch of the paper "Adversarial Training for Free!" in the context of the course [IFT 6756 - Game Theory and ML course](https://gauthiergidel.github.io/courses/game_theory_ML_2021.html).
 
 The implementation is in the src folder; the notebooks test the paper slightly.
