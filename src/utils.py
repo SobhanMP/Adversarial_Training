@@ -3,6 +3,8 @@ from collections import defaultdict
 import time
 import torch
 import torch.nn.functional as F
+
+
 """Set the gradient of a tensor to zero, just like torch.optim.Optimizer"""
 def tensor_zero_grad(x, set_to_none: bool = False):
     if x.grad is not None:
@@ -32,6 +34,7 @@ class Collectinator:
 """ A performance tracker
 
 Track accuracy, loss and runtime
+PRINTING CAUSES THE END TIME TO BE SET (only the first print)
 """
 class Logisticator:
     def __init__(self, epoch=None) -> None:
@@ -117,6 +120,11 @@ def run_val(model, testloader, epoch, name='val'):
         print(f'{name} \t {epoch + 1}: {logs}')
     return logs
 
+'''
+logholder is a default dict or similar object that gives a list for each attack
+category is the name that should be appended to each attack
+attacks is a list of attacks 
+'''
 def run_attacks(logholder, attacks, attack_names, model, testloader, epoch, category='adv_test'):
     model.train(False)
     for (attack, name) in zip(attacks, attack_names):

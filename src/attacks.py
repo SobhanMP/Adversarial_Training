@@ -3,15 +3,12 @@ from turtle import backward
 import torch
 import torch.nn.functional as F
 from .utils import tensor_zero_grad, Logisticator
-''' Projected gradient descent attack with k steps, M
-
+''' 
+Projected gradient descent attacks with K steps on the ininity ball 
 model: an object that has .zero_grad() and __call__(batch) -> pred
-
-criterion: a loss function that takes ONE argument
-    use a lambda function to convert the l(x, y) to l(x)
-
-x: an input batch
 K: number of training steps
+e and e_s are the maximim noise level
+min-max, set the levels that the output should be clamped into
 '''
 
 class Attack:
@@ -51,6 +48,12 @@ class Attack:
     def initialize(self, model):
         self.t = model.training # for 7-PDG training
         model.train(False)
+
+'''
+PGD attack
+e is the noise level and e_s is the step size.
+early_stopping will cause the algorithm to train early if all predictions are wrong, useful for testing accuracy not loss
+'''
 class PGD(Attack):
     def __init__(self, K, e, e_s, min=0, max=1, loss=F.cross_entropy, early_stopping=False) -> None:
         super().__init__(K, e, e_s, min, max)
@@ -82,6 +85,12 @@ class PGD(Attack):
         
         return self.adv(x, noise)
     
+'''
+PGD attack with Carlini-Wagner loss. 
+e is the noise level and e_s is the step size
+based on the version from the free repo
+
+'''
 class CW(Attack):
     def __init__(self, K, c, e, e_s, min=0, max=1) -> None:
         super().__init__(K, e, e_s, min, max)
